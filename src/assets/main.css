@@ -1,0 +1,339 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #2547EB;
+    --primary-accent: #3B5BFD;
+    --secondary: #10B981;
+    --canvas: #F8FAFC;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #F8FAFC;
+    color: #0F172A;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  .font-mono,
+  .tabular-numbers {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* ============================================================
+   GSAP / ANIMATION UTILITIES
+   ============================================================ */
+
+/* Elements hidden before JS animations kick in */
+.gsap-hidden {
+  opacity: 0;
+  transform: translateY(32px);
+}
+
+/* Reveal animation baseline */
+.reveal-up {
+  opacity: 0;
+  transform: translateY(40px);
+}
+
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.reveal-right {
+  opacity: 0;
+  transform: translateX(40px);
+}
+
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.94);
+}
+
+/* ============================================================
+   LIGHT GRID BACKGROUNDS
+   ============================================================ */
+.bg-light-grid {
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+}
+
+.bg-dot-pattern-light {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ============================================================
+   CARD STYLES
+   ============================================================ */
+.card-clean {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-clean:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  transform: translateY(-2px);
+}
+
+.card-specular {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 60px -8px rgba(0,0,0,0.4);
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: #F1F5F9; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #2547EB; }
+
+/* ============================================================
+   HERO / IMMERSIVE COMPONENTS
+   ============================================================ */
+.hero-gradient-overlay {
+  /* Gauche opaque pour lisibilité du texte, droite 100% transparent pour les personnes */
+  background: linear-gradient(
+    to right,
+    rgba(248, 250, 252, 0.95) 0%,
+    rgba(248, 250, 252, 0.85) 30%,
+    rgba(248, 250, 252, 0.40) 50%,
+    rgba(248, 250, 252, 0.08) 65%,
+    rgba(248, 250, 252, 0.00) 75%
+  );
+}
+
+/* Sur mobile, le visuel panoramique reste proportionnel au lieu d'être agrandi
+   par object-cover dans une zone verticale étroite. */
+@media (max-width: 767px) {
+  .hero-background {
+    inset: 4rem 0 auto;
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+
+  .hero-background-image {
+    display: block;
+    height: auto;
+    min-height: 0;
+    object-fit: contain;
+    object-position: center top;
+  }
+
+  .hero-background .hero-gradient-overlay {
+    background: linear-gradient(
+      to bottom,
+      rgba(248, 250, 252, 0.05) 0%,
+      rgba(248, 250, 252, 0.35) 48%,
+      rgba(248, 250, 252, 0.98) 100%
+    );
+  }
+}
+
+/* ============================================================
+   MAGNETIC BUTTON EFFECT
+   ============================================================ */
+.btn-magnetic {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-magnetic::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.15);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.btn-magnetic:hover::before { opacity: 1; }
+
+/* ============================================================
+   COUNTER ANIMATION NUMBERS
+   ============================================================ */
+.counter-number {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   GLOWING BADGE
+   ============================================================ */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+
+.badge-live {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* ============================================================
+   GRADIENT TEXT
+   ============================================================ */
+.text-gradient-primary {
+  background: linear-gradient(135deg, #2547EB 0%, #3B5BFD 50%, #10B981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, #F59E0B 0%, #FCD34D 50%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================================
+   FLOATING ANIMATION
+   ============================================================ */
+@keyframes float-y {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float-y 4s ease-in-out infinite;
+}
+
+/* ============================================================
+   SVG CHART DRAW
+   ============================================================ */
+@keyframes draw-line {
+  from { stroke-dashoffset: 1000; }
+  to { stroke-dashoffset: 0; }
+}
+
+.chart-line-animate {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: draw-line 2s ease-out forwards;
+  animation-delay: 0.5s;
+}
+
+/* ============================================================
+   SHIMMER LOADING
+   ============================================================ */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.06) 50%,
+    transparent 100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 2.5s linear infinite;
+}
+
+/* ============================================================
+   SECTION DIVIDERS
+   ============================================================ */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(15, 23, 42, 0.1) 20%,
+    rgba(15, 23, 42, 0.1) 80%,
+    transparent
+  );
+}
+
+/* ============================================================
+   VUE TRANSITION GROUPS
+   ============================================================ */
+.v-enter-active, .v-leave-active {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.v-enter-from {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.v-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* Fade slide */
+.fade-slide-enter-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fade-slide-leave-active {
+  transition: all 0.25s ease-in;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ============================================================
+   MARQUEE LOGOS
+   ============================================================ */
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 30s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ============================================================
+   DARK TERMINAL CARD
+   ============================================================ */
+.terminal-container {
+  background: #0B0F19;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 32px 80px -16px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(0,0,0,0.3);
+}

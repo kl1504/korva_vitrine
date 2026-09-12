@@ -1,0 +1,34 @@
+{
+  "name": "korva-vitrine",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Vitrine Korva - Precision Fiscal Instrument",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "framer-motion": "^13.2.0",
+    "gsap": "^3.12.5",
+    "lucide-react": "^1.42.0",
+    "lucide-vue-next": "^0.350.0",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.6.0",
+    "vue": "^3.4.21"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.0",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "autoprefixer": "^10.5.5",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^6.0.3",
+    "vite": "^5.1.4"
+  }
+}
