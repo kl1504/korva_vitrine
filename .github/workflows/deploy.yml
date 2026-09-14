@@ -1,0 +1,149 @@
+name: Korva CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  security-scan:
+    name: Code Analysis, Vulnerability Scan & Leaks Detection
+    runs-on: ubuntu-24.04
+    permissions:
+        contents: read
+        pull-requests: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Analyse SonarQube
+        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - name: Run SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  build:
+    name: Build the project
+    runs-on: ubuntu-24.04
+    needs: security-scan
+    permissions:    
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Configure Docker Buildx
+        uses: docker/setup-buildx-action@v2.11.0
+      - name: Check if the tests pass
+        run: docker-compose run --rm korva-vitrine-dev npm test --if-present
+      - name: Build the Docker image
+        run: docker compose up -d --build
+      - name: Upload the Docker image as an artifact
+        uses: actions/upload-artifact@v3.1.2
+        with:
+          name: korva-vitrine-dev
+
+  image-scan:
+    name: Scan the Docker image to check vulnerabilities
+    runs-on: ubuntu-24.04
+    needs: build
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+           persist-credentials: false
+      - name: Download the Docker image artifact
+        uses: actions/download-artifact@v3.2.0
+        with:
+          name: korva-vitrine-dev
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: korva-vitrine-dev:{{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-report.sarif'
+          severity: 'CRITICAL, HIGH'
+          exit-code : '1'
+          ignore-unfixed: true
+      - name: Upload Trivy scan results to GitHUb Security tab
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        if: always()
+        with:
+          sarif_file: trivy-report.sarif
+  deploy:
+    name: Deploy the project
+    runs-on: self-hosted
+    needs: image-scan
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Download the Docker image artifact
+        uses: actions/download-artifact@v3.2.0
+        with:
+          name: korva-vitrine-dev
+      - name: Start Docker Containers
+        run: docker compose up -d
+      - name: Récupérer l'IP local du runner
+        id: local_ip
+        run: |
+          RUNNER_IP=$(hostname -I | awk '{print $1}')
+          echo "L'adresse IP locale de ce runner est : $RUNNER_IP"
+          echo "ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+      - name: Valider l'accès via l'IP et le port
+        run: |
+          sleep 10
+          echo "Site accessible sur : http://${{ steps.local_ip.outputs.ip }}:7001"
+          curl -v http://${{ steps.local_ip.outputs.ip }}:7001
+      - name: Docker Clean Up
+        run: docker image prune -f
+  dast_scan:
+    name: DAST Scan
+    runs-on: ubuntu-24.04
+    needs: deploy
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Scan DAST with OWASP ZAP
+        uses: zaproxy/action-full-scan@v0.12.0
+        with:
+          target: 'http://192.168.122.1:7001'
+          cmd_options: '-a'
+          fail_action: false
+          artifact_name: 'zap-raw-html-report'
+
+      - name: Install wkhtmltopdf
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wkhtmltopdf
+
+      - name: Convert ZAP report into PDF
+        run: |
+          wkhtmltopdf --enable-local-file-access report_html.html zap-vulnerability-report.pdf
+
+      - name: Publish the report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-vulnerability-report-pdf
+          path: zap-vulnerability-report.pdf
+          retention-days: 15
+
+
+
