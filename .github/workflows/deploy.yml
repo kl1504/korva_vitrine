@@ -20,7 +20,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: SonarQube Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995
+        with:
+          scannerVersion: 6.2.0.4584
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Nécessaire pour l'analyse des PR
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -140,6 +142,5 @@ jobs:
           name: zap-vulnerability-report-pdf
           path: zap-vulnerability-report.pdf
           retention-days: 15
-
 
 
