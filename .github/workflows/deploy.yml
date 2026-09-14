@@ -29,7 +29,7 @@ jobs:
         run: cat .scannerwork/report-task.txt
 
       - name: Debug - Vérifier le protocole
-        run: grep "serverUrl" .scannerwork/report-task.txt | cut -c1-11
+        run: grep "serverUrl" .scannerwork/report-task.txt | cut -c1-16
 
       - name: Run SonarQube Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
