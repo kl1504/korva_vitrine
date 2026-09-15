@@ -44,6 +44,8 @@ jobs:
         run: docker compose up -d --build korva-vitrine-dev
         env:
           IMAGE_TAG: ${{ github.sha }}
+      - name: Archive Docker image to file archive
+        run: docker save korva-vitrine-dev:${{ github.sha }} -o korva-vitrine-dev.tar
       - name: Upload the Docker image as an artifact
         uses: ishworkh/container-image-artifact-upload@d36c22457a2ea9fa45b5741c5a9d935bd893c94c
         with:
