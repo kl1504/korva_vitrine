@@ -48,7 +48,7 @@ jobs:
         uses: ishworkh/container-image-artifact-upload@d36c22457a2ea9fa45b5741c5a9d935bd893c94c
         with:
           image: "korva-vitrine-dev:${{ github.sha }}"
-          retention-days: 2
+          retention_days: 2
 
   image-scan:
     name: Scan the Docker image to check vulnerabilities
