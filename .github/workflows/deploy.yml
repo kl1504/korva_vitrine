@@ -43,18 +43,21 @@ jobs:
       - name: Build the Docker image
         run: docker compose up -d --build korva-vitrine-dev
       
-      - name: Assign security SHA tag to image
-        run: docker tag korva-vitrine-dev:latest korva-vitrine-dev:${{ github.sha }}
-
-      - name: Archive Docker image to file archive
-        run: docker save korva-vitrine-dev:${{ github.sha }} -o korva-vitrine-dev.tar
-
-      - name: Upload the Docker image as an artifact
-        uses: ishworkh/container-image-artifact-upload@v2.0.0
+      - name: Construire l'image Docker
+        uses: docker/build-push-action@v6
         with:
-          image: "korva-vitrine-dev:${{ github.sha }}"
-          retention_days: 2
+          load: true
+          tags: korva-vitrine-dev:${{ github.sha }}
 
+      - name: Exporter l'image en fichier tar
+        run: docker save korva-vitrine-dev:${{ github.sha }} -o /tmp/korva-vitrine-dev.tar
+
+      - name: Uploader l'image Docker en artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/korva-vitrine-dev.tar
+          retention-days: 2
   image-scan:
     name: Scan the Docker image to check vulnerabilities
     runs-on: ubuntu-24.04
@@ -70,7 +73,7 @@ jobs:
       - name: Download the Docker image artifact
         uses: actions/download-artifact@v3.2.0
         with:
-          name: korva-vitrine-dev
+          name: docker-image
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
