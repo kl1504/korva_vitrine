@@ -42,12 +42,15 @@ jobs:
         run: docker compose run --rm korva-vitrine-dev npm test --if-present
       - name: Build the Docker image
         run: docker compose up -d --build korva-vitrine-dev
-        env:
-          IMAGE_TAG: ${{ github.sha }}
+      
+      - name: Assign security SHA tag to image
+        run: docker tag korva-vitrine-dev:latest korva-vitrine-dev:${{ github.sha }}
+
       - name: Archive Docker image to file archive
         run: docker save korva-vitrine-dev:${{ github.sha }} -o korva-vitrine-dev.tar
+
       - name: Upload the Docker image as an artifact
-        uses: ishworkh/container-image-artifact-upload@d36c22457a2ea9fa45b5741c5a9d935bd893c94c
+        uses: ishworkh/container-image-artifact-upload@v2.0.0
         with:
           image: "korva-vitrine-dev:${{ github.sha }}"
           retention_days: 2
