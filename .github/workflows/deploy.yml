@@ -41,11 +41,14 @@ jobs:
       - name: Check if the tests pass
         run: docker compose run --rm korva-vitrine-dev npm test --if-present
       - name: Build the Docker image
-        run: docker compose up -d --build
+        run: docker compose up -d --build korva-vitrine-dev
+        env:
+          IMAGE_TAG: ${{ github.sha }}
       - name: Upload the Docker image as an artifact
-        uses: actions/upload-artifact@v4
+        uses: ishworkh/container-image-artifact-upload@d36c22457a2ea9fa45b5741c5a9d935bd893c94c
         with:
-          name: korva-vitrine-dev
+          image: "korva-vitrine-dev:${{ github.sha }}"
+          retention-days: 2
 
   image-scan:
     name: Scan the Docker image to check vulnerabilities
