@@ -38,26 +38,29 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Configure Docker Buildx
         uses: docker/setup-buildx-action@v4
+
+      # Utilisation du compose UNIQUEMENT pour valider les tests de dev
       - name: Check if the tests pass
         run: docker compose run --rm korva-vitrine-dev npm test --if-present
-      - name: Build the Docker image
-        run: docker compose up -d --build korva-vitrine-dev
-      
+
+      # Build propre et standardisé avec le SHA
       - name: Construire l'image Docker
         uses: docker/build-push-action@v6
         with:
           load: true
-          tags: korva-vitrine-dev:${{ github.sha }}
+          tags: image_website:${{ github.sha }}
 
       - name: Exporter l'image en fichier tar
-        run: docker save korva-vitrine-dev:${{ github.sha }} -o /tmp/korva-vitrine-dev.tar
+        run: docker save image_website:${{ github.sha }} -o /tmp/image_website.tar
 
+      # Correction : Nom de l'artéfact harmonisé à "docker-image"
       - name: Uploader l'image Docker en artifact
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
-          path: /tmp/korva-vitrine-dev.tar
+          path: /tmp/image_website.tar
           retention-days: 2
+  
   image-scan:
     name: Scan the Docker image to check vulnerabilities
     runs-on: ubuntu-24.04
@@ -71,23 +74,32 @@ jobs:
         with:
            persist-credentials: false
       - name: Download the Docker image artifact
-        uses: actions/download-artifact@v3.2.0
+        uses: actions/download-artifact@v4
         with:
           name: docker-image
+          path: /tmp
+
+      # Étape CRITIQUE ajoutée : Charger l'image brute du .tar dans le moteur Docker local
+      - name: Load Docker image from tar
+        run: docker load -i /tmp/image_website.tar
+
+      # Correction : Ciblage du bon nom d'image + Ajout du "$" manquant à github.sha
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
-          image-ref: korva-vitrine-dev:{{ github.sha }}
+          image-ref: image_website:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-report.sarif'
           severity: 'CRITICAL, HIGH'
           exit-code : '1'
           ignore-unfixed: true
-      - name: Upload Trivy scan results to GitHUb Security tab
-        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81
         if: always()
         with:
           sarif_file: trivy-report.sarif
+
   deploy:
     name: Deploy the project
     runs-on: self-hosted
@@ -100,22 +112,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Download the Docker image artifact
-        uses: actions/download-artifact@v3.2.0
+        uses: actions/download-artifact@v4
         with:
-          name: korva-vitrine-dev
+          name: docker-image
+          path: /tmp
+
+      # Étape CRITIQUE ajoutée : Charger l'image reçue pour que Docker Compose puisse l'exécuter
+      - name: Load Docker image
+        run: docker load -i /tmp/image_website.tar
+
+      # Note : docker compose up utilisera l'image chargée ou lue selon votre configuration
       - name: Start Docker Containers
         run: docker compose up -d
+
       - name: Récupérer l'IP local du runner
         id: local_ip
         run: |
           RUNNER_IP=$(hostname -I | awk '{print $1}')
           echo "L'adresse IP locale de ce runner est : $RUNNER_IP"
           echo "ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+
+      # Attention : Assurez-vous que le port de votre service de production ou dev mappe bien vers 7001
       - name: Valider l'accès via l'IP et le port
         run: |
           sleep 10
           echo "Site accessible sur : http://${{ steps.local_ip.outputs.ip }}:7001"
           curl -v http://${{ steps.local_ip.outputs.ip }}:7001
+
       - name: Docker Clean Up
         run: docker image prune -f
   dast_scan:
