@@ -1,37 +1,15 @@
 services:
-  # Service Production : Nginx servant l'application compilée (SPA)
-  korva-vitrine:
-    container_name: korva-vitrine-prod
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    env_file:
-      - .env
-    ports:
-      - "${VITRINE_PORT:-8085}:3000"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-
-  # Service Développement : Vite dev server avec Hot Reload (HMR)
-  korva-vitrine-dev:
-    container_name: korva-vitrine-dev
-    profiles:
-      - dev
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: development
-    env_file:
-      - .env
-    ports:
-      - "${VITRINE_DEV_PORT:-5174}:5174"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    restart: unless-stopped
+    korva-vitrine:
+        build:
+            context: .
+            dockerfile: Dockerfile
+            target: production
+        ports:
+            - "8085:3000"
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 5s

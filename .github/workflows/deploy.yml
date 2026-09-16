@@ -39,11 +39,9 @@ jobs:
       - name: Configure Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      # Utilisation du compose UNIQUEMENT pour valider les tests de dev
       - name: Check if the tests pass
         run: docker compose run --rm korva-vitrine-dev npm test --if-present
 
-      # Build propre et standardisé avec le SHA
       - name: Construire l'image Docker
         uses: docker/build-push-action@v6
         with:
@@ -53,7 +51,6 @@ jobs:
       - name: Exporter l'image en fichier tar
         run: docker save image_website:${{ github.sha }} -o /tmp/image_website.tar
 
-      # Correction : Nom de l'artéfact harmonisé à "docker-image"
       - name: Uploader l'image Docker en artifact
         uses: actions/upload-artifact@v4
         with:
@@ -79,11 +76,9 @@ jobs:
           name: docker-image
           path: /tmp
 
-      # Étape CRITIQUE ajoutée : Charger l'image brute du .tar dans le moteur Docker local
       - name: Load Docker image from tar
         run: docker load -i /tmp/image_website.tar
 
-      # Correction : Ciblage du bon nom d'image + Ajout du "$" manquant à github.sha
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
@@ -93,12 +88,14 @@ jobs:
           severity: 'CRITICAL, HIGH'
           exit-code : '0'
           ignore-unfixed: true
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81
-        if: always()
+        
+      - name: Upload the Trivy report as an artifact
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: trivy-report.sarif
+          name: trivy-vulnerability-report
+          path: trivy-report.sarif
+          retention-days: 2
+      
 
   deploy:
     name: Deploy the project
@@ -117,11 +114,9 @@ jobs:
           name: docker-image
           path: /tmp
 
-      # Étape CRITIQUE ajoutée : Charger l'image reçue pour que Docker Compose puisse l'exécuter
       - name: Load Docker image
         run: docker load -i /tmp/image_website.tar
 
-      # Note : docker compose up utilisera l'image chargée ou lue selon votre configuration
       - name: Start Docker Containers
         run: docker compose up -d
 
@@ -132,17 +127,17 @@ jobs:
           echo "L'adresse IP locale de ce runner est : $RUNNER_IP"
           echo "ip=$RUNNER_IP" >> $GITHUB_OUTPUT
 
-      # Attention : Assurez-vous que le port de votre service de production ou dev mappe bien vers 7001
       - name: Valider l'accès via l'IP et le port
         run: |
           sleep 10
-          echo "Site accessible sur : http://${{ steps.local_ip.outputs.ip }}:7001"
-          curl -v http://${{ steps.local_ip.outputs.ip }}:7001
+          echo "Site accessible sur : http://${{ steps.local_ip.outputs.ip }}:8085"
+          curl -v http://${{ steps.local_ip.outputs.ip }}:8085
 
       - name: Docker Clean Up
         run: docker image prune -f
+
   dast_scan:
-    name: DAST Scan
+    name: Dynamic Analysis with OWASP ZAP
     runs-on: ubuntu-24.04
     needs: deploy
     permissions:
@@ -155,7 +150,7 @@ jobs:
       - name: Scan DAST with OWASP ZAP
         uses: zaproxy/action-full-scan@v0.12.0
         with:
-          target: 'http://192.168.122.1:7001'
+          target: 'http://172.20.20.23:8085'
           cmd_options: '-a'
           fail_action: false
           artifact_name: 'zap-raw-html-report'
@@ -174,7 +169,57 @@ jobs:
         with:
           name: zap-vulnerability-report-pdf
           path: zap-vulnerability-report.pdf
-          retention-days: 15
+          retention-days: 2
+
+  send_email:
+    name: Send the reports by email
+    runs-on: ubuntu-24.04
+    needs: [image-scan, dast_scan]
+    permissions:
+      contents: read
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Download the Trivy report
+        uses: actions/download-artifact@v4
+        with:
+          name: trivy-vulnerability-report
+          path: .
+
+      - name: Download the ZAP report
+        uses: actions/download-artifact@v4
+        with:
+          name: zap-vulnerability-report-pdf
+          path: .
+
+      - name: Send email with reports
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Security Reports regarding the project Korva - ${{ github.sha }}"
+          to: ${{ secrets.MAIL_TO }}
+          from: KORVA Deployment Team
+          body: |
+            Hello Team,
+
+            Please find attached the latest security reports for the Korva project.
+
+            1. Trivy Vulnerability Report (SARIF format)
+            2. OWASP ZAP Dynamic Analysis Report (PDF format)
+
+            Best regards,
+            Kael Avande,
+            KORVA Deployment Team
+          attachments: trivy-report.sarif, zap-vulnerability-report.pdf
+
+            
+
+
 
 
 
