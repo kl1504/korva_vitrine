@@ -40,7 +40,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Check if the tests pass
-        run: docker compose run --rm korva-vitrine-dev npm test --if-present
+        run: docker compose run --rm korva-vitrine npm test --if-present
 
       - name: Construire l'image Docker
         uses: docker/build-push-action@v6
