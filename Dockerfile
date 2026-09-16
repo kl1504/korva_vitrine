@@ -15,6 +15,7 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5174"]
 FROM node:20-alpine AS production
 WORKDIR /app
 RUN npm install --global serve
+COPY --chown=node:node --from=node-builder /app/package.json ./package.json
 COPY --chown=node:node --from=node-builder /app/dist ./dist
 
 USER node
