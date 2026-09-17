@@ -125,7 +125,7 @@ jobs:
         run: |
           RUNNER_IP=$(hostname -I | awk '{print $1}')
           echo "L'adresse IP locale de ce runner est : $RUNNER_IP"
-          echo "ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          echo "ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
 
       - name: Valider l'accès via l'IP et le port
         run: |

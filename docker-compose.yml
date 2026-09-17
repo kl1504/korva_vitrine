@@ -4,6 +4,8 @@ services:
             context: .
             dockerfile: Dockerfile
             target: production
+        env_file:
+            - .env
         ports:
             - "8085:3000"
         restart: unless-stopped
