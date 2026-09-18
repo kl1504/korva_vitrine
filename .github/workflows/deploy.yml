@@ -205,7 +205,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "Security Reports regarding the project Korva"
           to: ${{ secrets.MAIL_TO }}
-          from: KORVA Deployment Team
+          from: KORVA Deployment Team <${{ secrets.MAIL_FROM }}>
           body: |
             Hello Team,
 
