@@ -19,12 +19,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995
         with:
           scannerVersion: 6.2.0.4584
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build:
@@ -37,22 +40,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Configure Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
 
       - name: Check if the tests pass
         run: docker compose run --rm korva-vitrine npm test --if-present
 
-      - name: Construire l'image Docker
-        uses: docker/build-push-action@v6
+      - name: Build the docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           load: true
           tags: image_website:${{ github.sha }}
 
-      - name: Exporter l'image en fichier tar
+      - name: Export to .tar file
         run: docker save image_website:${{ github.sha }} -o /tmp/image_website.tar
 
-      - name: Uploader l'image Docker en artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload the Docker image into artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: docker-image
           path: /tmp/image_website.tar
@@ -71,7 +74,7 @@ jobs:
         with:
            persist-credentials: false
       - name: Download the Docker image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: docker-image
           path: /tmp
@@ -90,13 +93,12 @@ jobs:
           ignore-unfixed: true
         
       - name: Upload the Trivy report as an artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: trivy-vulnerability-report
           path: trivy-report.sarif
           retention-days: 2
       
-
   deploy:
     name: Deploy the project
     runs-on: self-hosted
@@ -109,7 +111,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Download the Docker image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: docker-image
           path: /tmp
@@ -120,17 +122,17 @@ jobs:
       - name: Start Docker Containers
         run: docker compose up -d
 
-      - name: Récupérer l'IP local du runner
+      - name: Get the local IP address of the runner
         id: local_ip
         run: |
           RUNNER_IP=$(hostname -I | awk '{print $1}')
-          echo "L'adresse IP locale de ce runner est : $RUNNER_IP"
+          echo "IP local address : $RUNNER_IP"
           echo "ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
 
-      - name: Valider l'accès via l'IP et le port
+      - name: Validate access via IP and port
         run: |
           sleep 10
-          echo "Site accessible sur : http://${{ steps.local_ip.outputs.ip }}:8085"
+          echo "Website available at : http://${{ steps.local_ip.outputs.ip }}:8085"
           curl -v http://${{ steps.local_ip.outputs.ip }}:8085
 
       - name: Docker Clean Up
@@ -148,7 +150,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Scan DAST with OWASP ZAP
-        uses: zaproxy/action-full-scan@v0.12.0
+        uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c
         with:
           target: 'http://172.20.20.23:8085'
           cmd_options: '-a'
@@ -165,7 +167,7 @@ jobs:
           wkhtmltopdf --enable-local-file-access report_html.html zap-vulnerability-report.pdf
 
       - name: Publish the report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: zap-vulnerability-report-pdf
           path: zap-vulnerability-report.pdf
@@ -183,25 +185,25 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Download the Trivy report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: trivy-vulnerability-report
           path: .
 
       - name: Download the ZAP report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: zap-vulnerability-report-pdf
           path: .
 
       - name: Send email with reports
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@67ce3558d613188179559c61d3565140cf389968
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "Security Reports regarding the project Korva - ${{ github.sha }}"
+          subject: "Security Reports regarding the project Korva"
           to: ${{ secrets.MAIL_TO }}
           from: KORVA Deployment Team
           body: |
