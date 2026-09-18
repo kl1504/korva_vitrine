@@ -196,7 +196,7 @@ jobs:
           name: zap-vulnerability-report-pdf
           path: .
 
-      - name: Send email with reports
+      - name: Send email with reports.
         uses: dawidd6/action-send-mail@67ce3558d613188179559c61d3565140cf389968
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
