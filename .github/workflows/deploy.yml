@@ -129,7 +129,7 @@ jobs:
           echo "IP local address : $RUNNER_IP"
           echo "ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
 
-      - name: Validate access via IP and port
+      - name: Validate access via IP and port.
         run: |
           sleep 10
           echo "Website available at : http://${{ steps.local_ip.outputs.ip }}:8085"
