@@ -8,4 +8,6 @@ services:
             - .env
         ports:
             - "8085:3000"
+        volumes:
+            - .:/app
         restart: unless-stopped
