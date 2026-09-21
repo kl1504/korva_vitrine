@@ -7,6 +7,13 @@ on:
     types: [opened, synchronize, reopened]
     branches: [main]
 
+env:
+  REGISTRY: registry.local:5000
+  IMAGE_NAME: korva-website
+
+permissions:
+  contents: read
+
 jobs:
   security-scan:
     name: Code Analysis, Vulnerability Scan & Leaks Detection
@@ -32,10 +39,11 @@ jobs:
 
   build:
     name: Build the project
-    runs-on: ubuntu-24.04
+    runs-on: self-hosted
     needs: security-scan
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -45,21 +53,31 @@ jobs:
       - name: Check if the tests pass
         run: docker compose run --rm korva-vitrine npm test --if-present
 
+      - name: Log in to Private Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
       - name: Build the docker image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
-          load: true
-          tags: image_website:${{ github.sha }}
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-      - name: Export to .tar file
-        run: docker save image_website:${{ github.sha }} -o /tmp/image_website.tar
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
 
-      - name: Upload the Docker image into artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: docker-image
-          path: /tmp/image_website.tar
-          retention-days: 2
+      - name: Sign the image with Cosign
+        run: |
+          echo "$COSIGN_KEY" > cosign.key
+          cosign sign --yes --key cosign.key ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          rm -f cosign.key
+        env:
+          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
   
   image-scan:
     name: Scan the Docker image to check vulnerabilities
@@ -73,19 +91,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
            persist-credentials: false
-      - name: Download the Docker image artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      
+      - name: Log in to Private Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
         with:
-          name: docker-image
-          path: /tmp
-
-      - name: Load Docker image from tar
-        run: docker load -i /tmp/image_website.tar
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        uses: aquasecurity/trivy-action@e42fd0673e97e23eac54620cfb913e5ce36c25
         with:
-          image-ref: image_website:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-report.sarif'
           severity: 'CRITICAL, HIGH'
@@ -110,17 +127,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Download the Docker image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
-
-      - name: Load Docker image
-        run: docker load -i /tmp/image_website.tar
-
+      
       - name: Start Docker Containers
-        run: docker compose up -d
+        run: IMAGE_TAG=${{ github.sha }} docker compose up -d
 
       - name: Get the local IP address of the runner
         id: local_ip
