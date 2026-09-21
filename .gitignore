@@ -1,1 +1,3 @@
 registry-ca.crt
+cosign.key
+cosign.pub
