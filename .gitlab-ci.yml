@@ -1,0 +1,132 @@
+stages:
+  - security-scan
+  - build
+  - image-scan
+  - deploy
+  - dast-scan
+  - notify
+
+variables:
+  REGISTRY: "registry.local:5000"
+  IMAGE_NAME: "korva-website"
+  IMAGE_TAG: "$CI_COMMIT_SHA"
+
+# Job d'analyse de code, secrets et vulnérabilités (SonarQube & Gitleaks)
+security-scan:
+  stage: security-scan
+  tags:
+    - self-hosted
+  only:
+    - main
+    - merge_requests
+  script:
+    - echo "Running Gitleaks detection..."
+    - docker run --rm -v $(pwd):/path zricetheory/gitleaks:latest detect --source=/path --verbose --redact
+    - echo "Running SonarQube Scan..."
+    - docker run --rm -v "$(pwd):/usr/src" -e SONAR_TOKEN="$SONAR_TOKEN" sonarsource/sonar-scanner-cli:6.2 sonar-scanner
+
+# Compilation du projet, Tests, Build Docker et signature Cosign
+build:
+  stage: build
+  tags:
+    - self-hosted
+  needs:
+    - security-scan
+  before_script:
+    - docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD" "$REGISTRY"
+  script:
+    - echo "Checking if the tests pass..."
+    - docker compose run --rm korva-vitrine npm test --if-present
+    - echo "Building and pushing the Docker image..."
+    - docker build -t "$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" .
+    - docker push "$REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+    - echo "Signing the image with Cosign..."
+    - echo "$COSIGN_KEY" > cosign.key
+    - docker run --rm -v $(pwd):/app -w /app sigstore/cosign:v2.2.3 sign --yes --key cosign.key --password "$COSIGN_PASSWORD" "$REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+    - rm -f cosign.key
+
+# Scan de l'image Docker poussée avec Trivy
+image-scan:
+  stage: image-scan
+  image: 
+    name: aquasecurity/trivy:latest
+    entrypoint: [""]
+  needs:
+    - build
+  script:
+    - trivy image --clear-cache
+    - trivy image --download-db-only
+    - trivy image --severity CRITICAL,HIGH --ignore-unfixed --format sarif --output trivy-report.sarif "$REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+  artifacts:
+    name: trivy-vulnerability-report
+    paths:
+      - trivy-report.sarif
+    expire_in: 2 days
+
+# Déploiement de l'application sur l'environnement local
+deploy:
+  stage: deploy
+  tags:
+    - self-hosted
+  needs:
+    - image-scan
+  script:
+    - echo "Starting Docker Containers..."
+    - IMAGE_TAG="$IMAGE_TAG" docker compose up -d
+    - sleep 10
+    - echo "Getting the local IP address..."
+    - RUNNER_IP=$(hostname -I | awk '{print $1}')
+    - echo "Website available at http://${RUNNER_IP}:8085"
+    - curl -v "http://${RUNNER_IP}:8085"
+    - echo "Docker Clean Up..."
+    - docker image prune -f
+
+# Analyse dynamique (DAST) avec OWASP ZAP sur l'IP cible
+dast_scan:
+  stage: dast-scan
+  image: 
+    name: owasp/zap2docker-stable:latest
+    entrypoint: [""]
+  needs:
+    - deploy
+  script:
+    - mkdir -p /zap/wrk
+    - zap-full-scan.py -t http://172.20.20.23:8085 -a -r report_html.html || true
+    - cp /zap/wrk/report_html.html .
+    - echo "Installing wkhtmltopdf..."
+    - apt-get update && apt-get install -y wkhtmltopdf
+    - wkhtmltopdf --enable-local-file-access report_html.html zap-vulnerability-report.pdf
+  artifacts:
+    name: zap-vulnerability-report-pdf
+    paths:
+      - zap-vulnerability-report.pdf
+    expire_in: 2 days
+
+# Envoi des rapports générés par Email (S'exécute toujours)
+send_email:
+  stage: notify
+  image: python:3.11-slim
+  needs:
+    - image-scan
+    - dast_scan
+  when: always
+  script:
+    - apt-get update && apt-get install -y swaks
+    - |
+      swaks --server "$MAIL_SERVER" --port "$MAIL_PORT" \
+        --auth LOGIN --auth-user "$MAIL_USERNAME" --auth-password "$MAIL_PASSWORD" \
+        --to "$MAIL_TO" \
+        --from "KORVA Deployment Team <$MAIL_FROM>" \
+        --header "Subject: Security Reports regarding the project Korva" \
+        --body "Hello Team,
+
+        Please find attached the latest security reports for the Korva project.
+
+        1. Trivy Vulnerability Report (SARIF format)
+        2. OWASP ZAP Dynamic Analysis Report (PDF format)
+
+        Best regards,
+        Kael Avande,
+        KORVA Deployment Team" \
+        --attach trivy-report.sarif \
+        --attach zap-vulnerability-report.pdf
